@@ -8,24 +8,29 @@ if not openai_api_key:
     st.error("Please set the OPENAI_API_KEY in your Streamlit Secrets.")
     st.stop()
 
-# App title and description
-st.title("Medical-Legal Assistant for Doctors in India")
+
+# Title and Description
+st.set_page_config(page_title="Medical-Legal Assistant")
+st.title("⚖️ Medical-Legal Assistant for Doctors in India")
+
 st.markdown("""
-This chatbot provides legal guidance to doctors in India to help avoid legal troubles.  
-Upload files (e.g., consent forms, legal notices) for analysis, and get advice with references to Indian laws and guidelines.  
-**Note**: This is for informational purposes only—not legal advice. Always consult a qualified legal professional.
+This chatbot offers **informational legal guidance** for doctors in India.  
+Upload legal documents (e.g., consent forms, notices), and get insights backed by Indian laws.  
+📌 *Disclaimer: This is not legal advice. Always consult a qualified professional.*
 """)
 
-# Sidebar with law summary
+# Sidebar: Key Laws
 with st.sidebar:
-    st.header("Key Indian Medical Laws")
+    st.header("📘 Indian Medical Law Summary")
     st.markdown("""
-    - **Indian Medical Council Act, 1956**: Governs medical practice and ethics (MCI Regulations, 2002).
-    - **Consumer Protection Act, 2019**: Addresses negligence and deficiency in service.
-    - **Clinical Establishments Act, 2010**: Mandates consent and record-keeping.
-    - **NDPS Act, 1985**: Regulates controlled substances.
-    - **IT Act, 2000**: Protects patient data privacy.
-    - **Landmark Cases**: *Samira Kohli (2008)* - Consent; *Jacob Mathew (2005)* - Negligence.
+    - **Indian Medical Council Act, 1956**: Ethics & standards (MCI Regulations, 2002).
+    - **Consumer Protection Act, 2019**: Handles negligence, services.
+    - **Clinical Establishments Act, 2010**: Consent, record-keeping.
+    - **NDPS Act, 1985**: Regulates narcotics.
+    - **IT Act, 2000**: Ensures patient data privacy.
+    - **Cases**:  
+      - *Samira Kohli (2008)* – Consent  
+      - *Jacob Mathew (2005)* – Medical negligence  
     """)
 
 # Disclaimer checkbox
@@ -34,49 +39,61 @@ if "disclaimer_accepted" not in st.session_state:
 
 if not st.session_state.disclaimer_accepted:
     st.warning("Please accept the disclaimer to proceed.")
-    if st.checkbox("I understand this is not legal advice and will consult a professional for specific cases."):
+    if st.checkbox("✅ I understand this is not legal advice."):
         st.session_state.disclaimer_accepted = True
 
-# Initialize chat history
+# Chat history initialization
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
 # Display chat history
 if st.session_state.disclaimer_accepted:
-    for message in st.session_state.chat_history:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+    for msg in st.session_state.chat_history:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
 
-    # File upload section
-    uploaded_file = st.file_uploader("Upload a file (e.g., consent form, legal notice)", type=["pdf", "txt", "docx"])
+    # File upload
+    uploaded_file = st.file_uploader("📄 Upload a legal/medical file (PDF, TXT, DOCX)", type=["pdf", "txt", "docx"])
     file_id = None
+
     if uploaded_file:
-        with st.spinner("Uploading file..."):
-            file_obj = client.files.create(
-                file=uploaded_file,
-                purpose="user_data"
-            )
-            file_id = file_obj.id
-            st.success(f"File uploaded successfully: {uploaded_file.name}")
+        try:
+            with st.spinner("🔁 Uploading file to OpenAI..."):
+                file_response = client.files.create(
+                    file=uploaded_file,
+                    purpose="user_data"
+                )
+                file_id = file_response.id
+                st.success(f"Uploaded `{uploaded_file.name}` successfully!")
+        except Exception as e:
+            st.error(f"File upload failed: {str(e)}")
 
     # User input
-    user_input = st.chat_input("Enter your medical-legal query (e.g., 'Is written consent needed for surgery?')")
+    user_input = st.chat_input("💬 Ask a medical-legal question...")
 
-    if user_input and st.session_state.disclaimer_accepted:
+    if user_input:
         with st.chat_message("user"):
             st.markdown(user_input)
-            st.session_state.chat_history.append({"role": "user", "content": user_input})
+        st.session_state.chat_history.append({"role": "user", "content": user_input})
 
-        with st.spinner("Fetching response..."):
+        with st.spinner("🧠 Thinking..."):
             try:
                 messages = [
                     {
                         "role": "system",
                         "content": """
-                        You are an AI expert in Indian medical-legal cases, assisting doctors to avoid legal troubles.  
-                        Provide detailed, in-depth guidance with references to Indian laws (e.g., Indian Medical Council Act, 1956; Consumer Protection Act, 2019; Clinical Establishments Act, 2010; NDPS Act, 1985; IT Act, 2000) and multiple relevant landmark judgments (e.g., Samira Kohli vs. Dr. Prabha Manchanda, 2008; Jacob Mathew vs. State of Punjab, 2005; V. Shantha vs. Indian Medical Association, 1995) to illustrate legal principles.  
-                        If a file is uploaded (e.g., consent form), analyze it thoroughly and check compliance with legal standards, citing specific clauses or cases.  
-                        Offer practical steps doctors can take and emphasize that this is not legal advice—doctors should consult professionals for specific cases.
+You are a legal assistant for Indian doctors. Your task is to explain legal requirements, potential liabilities, and provide guidance based on:
+- Indian Medical Council Act, 1956
+- Consumer Protection Act, 2019
+- Clinical Establishments Act, 2010
+- NDPS Act, 1985
+- IT Act, 2000
+Cite landmark judgments such as:
+- Samira Kohli vs. Dr. Prabha Manchanda (2008)
+- Jacob Mathew vs. State of Punjab (2005)
+- V. Shantha vs. Indian Medical Association (1995)
+
+When documents are uploaded, assess compliance and give actionable steps. Emphasize this is informational only, not legal advice.
                         """
                     }
                 ] + st.session_state.chat_history
@@ -99,24 +116,26 @@ if st.session_state.disclaimer_accepted:
                     max_tokens=1000
                 )
 
-                bot_response = response.choices[0].message.content.strip()
+                bot_reply = response.choices[0].message.content.strip()
 
                 with st.chat_message("assistant"):
-                    st.markdown(bot_response)
-                    st.session_state.chat_history.append({"role": "assistant", "content": bot_response})
+                    st.markdown(bot_reply)
+                st.session_state.chat_history.append({"role": "assistant", "content": bot_reply})
 
             except Exception as e:
-                st.error(f"An error occurred: {str(e)}")
+                st.error(f"❌ Error: {str(e)}")
 
-    # Save Chat button
-    if st.button("Save Chat"):
+    # Save chat to JSON
+    if st.button("💾 Save Chat"):
         chat_data = {
-            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "history": st.session_state.chat_history
+            "timestamp": datetime.now().isoformat(),
+            "chat": st.session_state.chat_history
         }
-        with open(f"chat_history_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json", "w") as f:
-            json.dump(chat_data, f)
-        st.success("Chat saved successfully!")
+        filename = f"chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        with open(filename, "w") as f:
+            json.dump(chat_data, f, indent=2)
+        st.success(f"Chat saved to `{filename}`")
 
 # Footer
-st.markdown(f"Current date: {datetime.now().strftime('%B %d, %Y')}")
+st.markdown("---")
+st.caption(f"🗓️ {datetime.now().strftime('%A, %B %d, %Y')} | Built with ❤️ by Shubhendu")
