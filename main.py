@@ -8,7 +8,7 @@ if not openai_api_key:
     st.error("Please set the OPENAI_API_KEY in your Streamlit Secrets.")
     st.stop()
 
-
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # Title and Description
 st.set_page_config(page_title="Medical-Legal Assistant")
 st.title("⚖️ Medical-Legal Assistant for Doctors in India")
